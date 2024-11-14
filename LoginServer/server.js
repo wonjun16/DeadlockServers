@@ -1,22 +1,29 @@
 const express = require('express');
-// const jwt = require('jsonwebtoken');
 const users = require('./users');
+// const jwt = require('jsonwebtoken');
 
 const app = express();
 const PORT = 8080;
-//const SECRET_KEY = 'your_secret_key';
+//const SECRET_KEY = 'secret_key';
 
 app.use(express.json());
 
 // 회원 가입
 app.post('/register', (req, res) => {
-  const { id, password } = req.body;
-  const user = users.register(id, password);
-  if (user) {
-    res.status(201).json({ message: 'User registered successfully' });
-  } else {
-    res.status(400).json({ message: 'User already exists' });
-  }
+  const { id, password, nickname } = req.body;
+
+  users.register(id, password, nickname, (error, result) => {
+    if(error){
+      console.error('Register error: ', error);
+      return res.status(500).json({message: 'Server error'});
+    }
+
+    if (result) {
+      return res.status(201).json({ message: 'User registered successfully' });
+    } else {
+      return res.status(400).json({ message: 'User already exists' });
+    }
+  });
 });
 
 // 로그인
@@ -30,12 +37,12 @@ app.post('/login', (req, res) => {
     }
 
     if (user) {
-      res.json({ message: 'Login successful'});
+      return res.json({ message: 'Login successful'});
       // JWT 토큰 생성
       //const token = jwt.sign({ id: user.id }, SECRET_KEY, { expiresIn: '1h' });
       //res.json({ message: 'Login successful', token });
     } else {
-      res.status(401).json({ message: 'Invalid id or password' });
+      return res.status(401).json({ message: 'Invalid id or password' });
     }
   });
 });
