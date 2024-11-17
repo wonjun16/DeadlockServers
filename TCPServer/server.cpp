@@ -1,5 +1,7 @@
 #include "InitSocket.hpp"
 #include <iostream>
+#include "mysql.h"
+#include "Packet.h"
 
 int main()
 {
@@ -52,6 +54,14 @@ int main()
 
 						std::cout << "Client Socket Accepted\n";
 						//char* IP = inet_ntoa(ClientSock.sin_addr);
+						
+						//send ip, port to client
+						Packet packet;
+						packet.IP = "127.0.0.1";
+						packet.Port = 7777;
+
+						//int SendLength = send(ClientSocket, (char*)&packet, sizeof(packet), 0);
+						//std::cout << SendLength << '\n';
 					}
 					else
 					{
