@@ -22,7 +22,7 @@ int main()
 
 	fd_set ReadSocketList;
 	fd_set CopyReadSocketList;
-
+	
 	FD_ZERO(&ReadSocketList);
 	FD_SET(ListenSocket, &ReadSocketList);
 
