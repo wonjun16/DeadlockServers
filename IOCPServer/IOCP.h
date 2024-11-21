@@ -7,7 +7,7 @@
 
 #include "Define.h"
 
-class IOCompletionPort
+class IOCP
 {
 protected:
 	SOCKET ListenSocket = INVALID_SOCKET;
@@ -17,7 +17,7 @@ protected:
 	int ClientCnt = 0;
 
 	std::vector<std::thread> IOWorkerThreads;
-
+	
 	std::thread mAccepterThread;
 
 	HANDLE IOCPHandle = INVALID_HANDLE_VALUE;
@@ -29,8 +29,8 @@ protected:
 	char SocketBuf[1024] = { 0, };
 
 public:
-	IOCompletionPort(void){}
-	~IOCompletionPort(void)
+	IOCP(void){}
+	~IOCP(void)
 	{
 		WSACleanup();
 	}
@@ -87,7 +87,7 @@ public:
 	{
 		CreateClient(maxClientCount);
 
-		IOCPHandle = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, MAX_WORKERTHREAD);
+		IOCPHandle = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, MAX_IO_WORKER_THREAD);
 		if (IOCPHandle == NULL)
 		{
 			printf("CreateIoCompletionPort error : %d\n", WSAGetLastError());
@@ -131,6 +131,10 @@ public:
 			mAccepterThread.join();
 		}
 	}
+
+	virtual void OnConnect(ClientInfo* pClientInfo) {}
+
+	virtual void OnReceive(ClientInfo* pClientInfo) {}
 private:
 	void CreateClient(const UINT32 maxClientCount)
 	{
@@ -144,7 +148,7 @@ private:
 	{
 		unsigned int uThreadId = 0;
 
-		for (int i = 0; i < MAX_WORKERTHREAD; i++)
+		for (int i = 0; i < MAX_IO_WORKER_THREAD; i++)
 		{
 			IOWorkerThreads.emplace_back([this]() {WorkerThread(); });
 		}
@@ -188,57 +192,57 @@ private:
 		return true;
 	}
 
-	bool BindRecv(ClientInfo* pClientInfo)
-	{
-		DWORD dwFlag = 0;
-		DWORD dwRecvNumBytes = 0;
+	//bool BindRecv(ClientInfo* pClientInfo)
+	//{
+	//	DWORD dwFlag = 0;
+	//	DWORD dwRecvNumBytes = 0;
 
-		pClientInfo->m_stRecvOverlappedEx.m_wsaBuf.len = MAX_SOCKBUF;
-		pClientInfo->m_stRecvOverlappedEx.m_wsaBuf.buf = pClientInfo->recvBuf;
-		pClientInfo->m_stRecvOverlappedEx.m_eOperation = IOOperation::RECV;
+	//	pClientInfo->m_stRecvOverlappedEx.m_wsaBuf.len = MAX_SOCKBUF;
+	//	pClientInfo->m_stRecvOverlappedEx.m_wsaBuf.buf = pClientInfo->recvBuf;
+	//	pClientInfo->m_stRecvOverlappedEx.m_eOperation = IOOperation::RECV;
 
-		int Result = WSARecv(pClientInfo->m_socketClient,
-			&(pClientInfo->m_stRecvOverlappedEx.m_wsaBuf),
-			1,
-			&dwRecvNumBytes,
-			&dwFlag,
-			(LPWSAOVERLAPPED) & (pClientInfo->m_stRecvOverlappedEx),
-			NULL);
+	//	int Result = WSARecv(pClientInfo->m_socketClient,
+	//		&(pClientInfo->m_stRecvOverlappedEx.m_wsaBuf),
+	//		1,
+	//		&dwRecvNumBytes,
+	//		&dwFlag,
+	//		(LPWSAOVERLAPPED) & (pClientInfo->m_stRecvOverlappedEx),
+	//		NULL);
 
-		if (Result == SOCKET_ERROR && (WSAGetLastError() != ERROR_IO_PENDING))
-		{
-			printf("error : WSARecv() failed : %d\n", WSAGetLastError());
-			return false;
-		}
+	//	if (Result == SOCKET_ERROR && (WSAGetLastError() != ERROR_IO_PENDING))
+	//	{
+	//		printf("error : WSARecv() failed : %d\n", WSAGetLastError());
+	//		return false;
+	//	}
 
-		return true;
-	}
+	//	return true;
+	//}
 
-	bool SendMsg(ClientInfo* pClientInfo, char* pMsg, int nLen)
-	{
-		DWORD dwRecvNumBytes = 0;
+	//bool SendMsg(ClientInfo* pClientInfo, char* pMsg, int nLen)
+	//{
+	//	DWORD dwRecvNumBytes = 0;
 
-		//CopyMemory(pClientInfo->m_stSendOverlappedEx.m_szBuf, pMsg, nLen);
+	//	//CopyMemory(pClientInfo->m_stSendOverlappedEx.m_szBuf, pMsg, nLen);
 
-		pClientInfo->m_stSendOverlappedEx.m_wsaBuf.len = nLen;
-		//pClientInfo->m_stSendOverlappedEx.m_wsaBuf.buf = pClientInfo->m_stSendOverlappedEx.m_szBuf;
-		pClientInfo->m_stSendOverlappedEx.m_eOperation = IOOperation::SEND;
+	//	pClientInfo->m_stSendOverlappedEx.m_wsaBuf.len = nLen;
+	//	//pClientInfo->m_stSendOverlappedEx.m_wsaBuf.buf = pClientInfo->m_stSendOverlappedEx.m_szBuf;
+	//	pClientInfo->m_stSendOverlappedEx.m_eOperation = IOOperation::SEND;
 
-		int Result = WSASend(pClientInfo->m_socketClient,
-			&(pClientInfo->m_stSendOverlappedEx.m_wsaBuf),
-			1,
-			&dwRecvNumBytes,
-			0,
-			(LPWSAOVERLAPPED) & (pClientInfo->m_stSendOverlappedEx),
-			NULL);
+	//	int Result = WSASend(pClientInfo->m_socketClient,
+	//		&(pClientInfo->m_stSendOverlappedEx.m_wsaBuf),
+	//		1,
+	//		&dwRecvNumBytes,
+	//		0,
+	//		(LPWSAOVERLAPPED) & (pClientInfo->m_stSendOverlappedEx),
+	//		NULL);
 
-		if (Result == SOCKET_ERROR && (WSAGetLastError() != ERROR_IO_PENDING))
-		{
-			printf("error WSASend() failed : %d\n", WSAGetLastError());
-			return false;
-		}
-		return true;
-	}
+	//	if (Result == SOCKET_ERROR && (WSAGetLastError() != ERROR_IO_PENDING))
+	//	{
+	//		printf("error WSASend() failed : %d\n", WSAGetLastError());
+	//		return false;
+	//	}
+	//	return true;
+	//}
 
 	void WorkerThread()
 	{
@@ -321,11 +325,14 @@ private:
 				return;
 			}
 
-			Result = BindRecv(pClientInfo);
-			if (Result == false)
-			{
-				return;
-			}
+			//db에서 ip얻어와 json형식으로 send
+			OnConnect(pClientInfo);
+
+			//Result = BindRecv(pClientInfo);
+			//if (Result == false)
+			//{
+			//	return;
+			//}
 
 			char clientIP[32] = { 0, };
 			inet_ntop(AF_INET, &(ClientAddr.sin_addr), clientIP, 32 - 1);
