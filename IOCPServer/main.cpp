@@ -9,7 +9,7 @@ int main()
 {
 	Server server;
 
-	server.InitSocket();
+	server.InitSocketAndDB();
 
 	server.BindandListen(SERVER_PORT);
 

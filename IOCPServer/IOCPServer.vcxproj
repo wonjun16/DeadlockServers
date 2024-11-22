@@ -136,6 +136,7 @@
     <ClCompile Include="Server.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="DataManager.h" />
     <ClInclude Include="DB.h" />
     <ClInclude Include="Define.h" />
     <ClInclude Include="IOCP.h" />

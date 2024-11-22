@@ -2,6 +2,7 @@
 
 #include <WinSock2.h>
 #include <WS2tcpip.h>
+#include <iostream>
 
 const UINT32 MAX_IO_WORKER_THREAD = 4;
 const UINT32 MAX_SOCK_RECVBUF = 256;
@@ -24,6 +25,7 @@ struct OverlappedEx
 struct ClientInfo
 {
 	int user_no;
+	std::string user_name;
 	SOCKET m_socketClient;
 	OverlappedEx m_stRecvOverlappedEx;
 	OverlappedEx m_stSendOverlappedEx;

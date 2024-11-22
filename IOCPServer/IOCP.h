@@ -17,26 +17,28 @@ protected:
 	int ClientCnt = 0;
 
 	std::vector<std::thread> IOWorkerThreads;
-	
+
 	std::thread mAccepterThread;
 
 	HANDLE IOCPHandle = INVALID_HANDLE_VALUE;
-	
+
 	bool IsWorkerRun = true;
-	
+
 	bool IsAccepterRun = true;
 
 	char SocketBuf[1024] = { 0, };
 
 public:
-	IOCP(void){}
+	IOCP(void) {}
 	~IOCP(void)
 	{
 		WSACleanup();
 	}
 
-	bool InitSocket()
+	bool InitSocketAndDB()
 	{
+		OnInit();
+
 		WSADATA wsaData;
 
 		int Result = WSAStartup(MAKEWORD(2, 2), &wsaData);
@@ -132,6 +134,34 @@ public:
 		}
 	}
 
+	bool SendMsg(ClientInfo* pClientInfo, char* pMsg, int nLen)
+	{
+		DWORD dwRecvNumBytes = 0;
+
+		CopyMemory(pClientInfo->sendBuf, pMsg, nLen);
+
+		pClientInfo->m_stSendOverlappedEx.m_wsaBuf.len = nLen;
+		pClientInfo->m_stSendOverlappedEx.m_wsaBuf.buf = pClientInfo->sendBuf;
+		pClientInfo->m_stSendOverlappedEx.m_eOperation = IOOperation::SEND;
+
+		int Result = WSASend(pClientInfo->m_socketClient,
+			&(pClientInfo->m_stSendOverlappedEx.m_wsaBuf),
+			1,
+			&dwRecvNumBytes,
+			0,
+			(LPWSAOVERLAPPED) & (pClientInfo->m_stSendOverlappedEx),
+			NULL);
+
+		if (Result == SOCKET_ERROR && (WSAGetLastError() != ERROR_IO_PENDING))
+		{
+			printf("error WSASend() failed : %d\n", WSAGetLastError());
+			return false;
+		}
+		return true;
+	}
+
+	virtual void OnInit() {}
+
 	virtual void OnConnect(ClientInfo* pClientInfo) {}
 
 	virtual void OnReceive(ClientInfo* pClientInfo) {}
@@ -192,57 +222,31 @@ private:
 		return true;
 	}
 
-	//bool BindRecv(ClientInfo* pClientInfo)
-	//{
-	//	DWORD dwFlag = 0;
-	//	DWORD dwRecvNumBytes = 0;
+	bool BindRecv(ClientInfo* pClientInfo)
+	{
+		DWORD dwFlag = 0;
+		DWORD dwRecvNumBytes = 0;
 
-	//	pClientInfo->m_stRecvOverlappedEx.m_wsaBuf.len = MAX_SOCKBUF;
-	//	pClientInfo->m_stRecvOverlappedEx.m_wsaBuf.buf = pClientInfo->recvBuf;
-	//	pClientInfo->m_stRecvOverlappedEx.m_eOperation = IOOperation::RECV;
+		pClientInfo->m_stRecvOverlappedEx.m_wsaBuf.len = MAX_SOCKBUF;
+		pClientInfo->m_stRecvOverlappedEx.m_wsaBuf.buf = pClientInfo->recvBuf;
+		pClientInfo->m_stRecvOverlappedEx.m_eOperation = IOOperation::RECV;
 
-	//	int Result = WSARecv(pClientInfo->m_socketClient,
-	//		&(pClientInfo->m_stRecvOverlappedEx.m_wsaBuf),
-	//		1,
-	//		&dwRecvNumBytes,
-	//		&dwFlag,
-	//		(LPWSAOVERLAPPED) & (pClientInfo->m_stRecvOverlappedEx),
-	//		NULL);
+		int Result = WSARecv(pClientInfo->m_socketClient,
+			&(pClientInfo->m_stRecvOverlappedEx.m_wsaBuf),
+			1,
+			&dwRecvNumBytes,
+			&dwFlag,
+			(LPWSAOVERLAPPED) & (pClientInfo->m_stRecvOverlappedEx),
+			NULL);
 
-	//	if (Result == SOCKET_ERROR && (WSAGetLastError() != ERROR_IO_PENDING))
-	//	{
-	//		printf("error : WSARecv() failed : %d\n", WSAGetLastError());
-	//		return false;
-	//	}
+		if (Result == SOCKET_ERROR && (WSAGetLastError() != ERROR_IO_PENDING))
+		{
+			printf("error : WSARecv() failed : %d\n", WSAGetLastError());
+			return false;
+		}
 
-	//	return true;
-	//}
-
-	//bool SendMsg(ClientInfo* pClientInfo, char* pMsg, int nLen)
-	//{
-	//	DWORD dwRecvNumBytes = 0;
-
-	//	//CopyMemory(pClientInfo->m_stSendOverlappedEx.m_szBuf, pMsg, nLen);
-
-	//	pClientInfo->m_stSendOverlappedEx.m_wsaBuf.len = nLen;
-	//	//pClientInfo->m_stSendOverlappedEx.m_wsaBuf.buf = pClientInfo->m_stSendOverlappedEx.m_szBuf;
-	//	pClientInfo->m_stSendOverlappedEx.m_eOperation = IOOperation::SEND;
-
-	//	int Result = WSASend(pClientInfo->m_socketClient,
-	//		&(pClientInfo->m_stSendOverlappedEx.m_wsaBuf),
-	//		1,
-	//		&dwRecvNumBytes,
-	//		0,
-	//		(LPWSAOVERLAPPED) & (pClientInfo->m_stSendOverlappedEx),
-	//		NULL);
-
-	//	if (Result == SOCKET_ERROR && (WSAGetLastError() != ERROR_IO_PENDING))
-	//	{
-	//		printf("error WSASend() failed : %d\n", WSAGetLastError());
-	//		return false;
-	//	}
-	//	return true;
-	//}
+		return true;
+	}
 
 	void WorkerThread()
 	{
@@ -284,8 +288,10 @@ private:
 				//pClientInfo->recvBuf
 				printf("bytes : %d, msg : %s\n", dIOSIZE, pClientInfo->recvBuf);
 
+				OnReceive(pClientInfo);
+
 				//send to client
-				
+				BindRecv(pClientInfo);
 
 			}
 			else if (IOOperation::SEND == pOverlappedEx->m_eOperation)
@@ -325,14 +331,13 @@ private:
 				return;
 			}
 
-			//db에서 ip얻어와 json형식으로 send
 			OnConnect(pClientInfo);
 
-			//Result = BindRecv(pClientInfo);
-			//if (Result == false)
-			//{
-			//	return;
-			//}
+			Result = BindRecv(pClientInfo);
+			if (Result == false)
+			{
+				return;
+			}
 
 			char clientIP[32] = { 0, };
 			inet_ntop(AF_INET, &(ClientAddr.sin_addr), clientIP, 32 - 1);
